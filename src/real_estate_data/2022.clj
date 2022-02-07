@@ -35,21 +35,49 @@
                :region-name region-name
                obs-name observations}))
 
-(defn transform-ds [ds observation-name]
+(defn transform-rental-ds [ds]
   (let [dates (tc/column-names
                (tc/drop-columns ds ["RegionID" "RegionName" "SizeRank"]))]
     (->> ds
          tc/rows
-         (map #(extract-ds-from-row % observation-name dates))
+         (map (fn [[region-id region-name size-rank & observations]]
+                (tc/dataset {:date dates
+                             :region-id region-id
+                             :region-name region-name
+                             :size-rank size-rank
+                             :rent-price observations})))
+         (reduce
+          (fn [memo nextds]
+            (tc/concat memo nextds))))))
+
+(defn transform-home-value-ds [ds]
+  (let [dates (tc/column-names
+               (tc/drop-columns ds
+                                ["RegionID" "SizeRank" "RegionName"
+                                 "RegionType" "StateName"]))]
+    (->> ds
+         tc/rows
+         (map (fn [[region-id
+                    size-rank
+                    region-name
+                    region-type
+                    state-name & observations]]
+                (tc/dataset {:date dates
+                             :region-id region-id
+                             :size-rank size-rank
+                             :region-name region-name
+                             :region-type region-type
+                             :state-name state-name
+                             :home-value observations})))
          (reduce
           (fn [memo nextds]
             (tc/concat memo nextds))))))
 
 (def transformed-rental-data
-  (transform-ds rental-data :rental-price))
+  (transform-rental-ds rental-data))
 
 (def transformed-home-value-data
-  (transform-ds values-data :home-value))
+  (transform-home-value-ds values-data))
 
 
 ^kind/dataset
