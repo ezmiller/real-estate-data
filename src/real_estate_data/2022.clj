@@ -45,7 +45,6 @@
           (fn [memo nextds]
             (tc/concat memo nextds))))))
 
-
 (def transformed-rental-data
   (transform-ds rental-data :rental-price))
 
@@ -59,17 +58,4 @@ transformed-rental-data
 ^kind/dataset
 transformed-home-value-data
 
-(def combined-home-value-and-rent
-  (-> transformed-home-value-data
-      (tc/add-column :rental-price
-                     (:rental-price transformed-rental-data))))
 
-
-^kind/dataset
-combined-home-value-and-rent
-
-
-(reduce (fn [m [a b]]
-          (assoc m a (+ b 1)))
-        {}
-        {:x 1 :y 2})
