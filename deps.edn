@@ -1,0 +1,4 @@
+{:paths ["src" "data"] 
+ :deps  {scicloj/tablecloth  {:mvn/version "6.051"}
+         scicloj/notespace   {:mvn/version "3-beta8"}}}
+
