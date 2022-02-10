@@ -1,4 +1,5 @@
 {:paths ["src" "data"] 
  :deps  {scicloj/tablecloth  {:mvn/version "6.051"}
+         org.scicloj/tablecloth.time {:mvn/version "1.00-alpha-5-SNAPSHOT"}
          scicloj/notespace   {:mvn/version "3-beta8"}}}
 
