@@ -4,6 +4,7 @@
 
 
 (require '[tablecloth.api :as tc]
+         '[tablecloth.time.api :as tct]
          '[tech.v3.dataset :as ds])
 
 (def rental-data (tc/dataset "data/Metro_ZORI_AllHomesPlusMultifamily_SSA.csv"))
@@ -74,7 +75,14 @@
             (tc/concat memo nextds))))))
 
 (def transformed-rental-data
-  (transform-rental-ds rental-data))
+  (-> rental-data
+      (transform-rental-ds)
+      (tc/add-column :date
+                     (fn [ds]
+                       (->> (:date ds)
+                            (map #(apply str % "-01"))
+                            (map tct/string->time)
+                            (map tct/->months-end))))))
 
 (def transformed-home-value-data
   (transform-home-value-ds values-data))
@@ -85,5 +93,4 @@ transformed-rental-data
 
 ^kind/dataset
 transformed-home-value-data
-
 
