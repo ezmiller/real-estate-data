@@ -5,7 +5,8 @@
 
 (require '[tablecloth.api :as tc]
          '[tablecloth.time.api :as tct]
-         '[tech.v3.dataset :as ds])
+         '[tech.v3.dataset :as ds]
+         '[tech.v3.datatype.functional :as fun])
 
 (def rental-data (tc/dataset "data/Metro_ZORI_AllHomesPlusMultifamily_SSA.csv"))
 
@@ -85,7 +86,9 @@
                             (map tct/->months-end))))))
 
 (def transformed-home-value-data
-  (transform-home-value-ds values-data))
+  (-> values-data
+      (transform-home-value-ds)
+      (ds/column-cast :date :packed-local-date)))
 
 
 ^kind/dataset
@@ -93,4 +96,63 @@ transformed-rental-data
 
 ^kind/dataset
 transformed-home-value-data
+
+^kind/dataset
+(-> transformed-rental-data
+    (tc/select-rows (comp #(= % "Seattle, WA") :region-name))
+    (tct/adjust-frequency tct/->years-end {:include-columns [:region-name
+                                                             :region-id]})
+    (tc/aggregate {:mean-rent  #(fun/mean (% :rent-price))}))
+
+
+^kind/dataset
+(-> transformed-rental-data
+    (tc/select-rows (comp #(= % 395078) :region-id))
+    (tct/slice "2021-01-01" "2021-12-31"))
+
+^kind/dataset
+(-> transformed-home-value-data
+    (tc/select-rows (comp #(= % 395078) :region-id))
+    (tct/slice "2021-01-01" "2021-12-31"))
+
+(def rtp-data
+  (-> (tc/inner-join
+       (-> transformed-home-value-data
+           ;; (tc/select-rows (comp #(= % 395078) :region-id))
+           (tct/slice "2021-01-01" "2021-12-31")
+           (tc/select-columns [:date :region-id :region-name :home-value]))
+       (-> transformed-rental-data
+           ;; (tc/select-rows (comp #(= % 395078) :region-id))
+           (tct/slice "2021-01-01" "2021-12-31")
+           (tc/select-columns [:date :region-id :rent-price]))
+       [:date :region-id])
+      (tc/add-column :rtp
+                          (fn [ds] (fun/* 100
+                                          (fun// (:rent-price ds)
+                                                  (:home-value ds)))))
+      (tc/order-by [:region-id :date])))
+
+
+^kind/dataset
+rtp-data
+
+
+^kind/dataset
+(-> rtp-data
+    (tc/select-columns [:date :region-name :rtp])
+    (tct/adjust-frequency tct/->years-end
+                          {:include-columns [:date :region-name]
+                           :ungroup? true})
+    (tc/group-by [:region-name])
+    (tc/aggregate {:mean-rtp #(fun/mean (:rtp %))})
+    (tc/select-rows (comp #(> % 0.65) :mean-rtp))
+    (tc/order-by :mean-rtp :desc))
+
+
+^kind/dataset
+(tc/select-rows
+ rtp-data
+ (comp #(re-find #"Baltimore" %) :region-name))
+
+
 
