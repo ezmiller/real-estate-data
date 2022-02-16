@@ -18,6 +18,11 @@
 ^kind/dataset
 (tc/head values-data)
 
+(-> values-data
+    (tc/select-rows (comp #(= % "New York, NY") #(get % "RegionName")))
+    (get "2021-12-31")
+    float)
+
 (tc/rows (ds/select-rows rental-data (range 2)) :as-maps)
 
 ;; date region region_id rental-value home-value
@@ -88,7 +93,14 @@
 (def transformed-home-value-data
   (-> values-data
       (transform-home-value-ds)
-      (ds/column-cast :date :packed-local-date)))
+      (ds/column-cast :date :packed-local-date)
+      (tc/add-column :home-value-last-year #(fun/shift (:home-value %) 12))
+      (tc/add-column :appreciation
+                    (fn [ds]
+                      (fun/* 100
+                              (fun// (fun/- (:home-value ds) (:home-value-last-year ds))
+                                    (:home-value ds)))))
+      (tc/drop-columns [:home-value-last-year])))
 
 
 ^kind/dataset
@@ -120,7 +132,7 @@ transformed-home-value-data
        (-> transformed-home-value-data
            ;; (tc/select-rows (comp #(= % 395078) :region-id))
            (tct/slice "2021-01-01" "2021-12-31")
-           (tc/select-columns [:date :region-id :region-name :home-value]))
+           (tc/select-columns [:date :region-id :region-name :home-value :appreciation]))
        (-> transformed-rental-data
            ;; (tc/select-rows (comp #(= % 395078) :region-id))
            (tct/slice "2021-01-01" "2021-12-31")
@@ -130,29 +142,32 @@ transformed-home-value-data
                           (fn [ds] (fun/* 100
                                           (fun// (:rent-price ds)
                                                   (:home-value ds)))))
+      (tc/drop-columns [:right.date :right.region-id])
       (tc/order-by [:region-id :date])))
 
 
 ^kind/dataset
 rtp-data
 
-
 ^kind/dataset
 (-> rtp-data
-    (tc/select-columns [:date :region-name :rtp])
+    (tc/select-columns [:date :region-name :rtp :appreciation])
     (tct/adjust-frequency tct/->years-end
                           {:include-columns [:date :region-name]
                            :ungroup? true})
     (tc/group-by [:region-name])
-    (tc/aggregate {:mean-rtp #(fun/mean (:rtp %))})
+    (tc/aggregate {:mean-rtp #(fun/mean (:rtp %))
+                   :mean-appreciation #(fun/mean (:appreciation %))})
     (tc/select-rows (comp #(> % 0.65) :mean-rtp))
-    (tc/order-by :mean-rtp :desc))
+    (tc/reorder-columns [:region-name :mean-rtp :mean-appreciation])
+    (tc/order-by [:mean-appreciation :mean-rtp] :desc))
+
+;; ^kind/dataset
+;; (tc/select-rows
+;;  rtp-data
+;;  (comp #(re-find #"Seattle" %) :region-name))
 
 
-^kind/dataset
-(tc/select-rows
- rtp-data
- (comp #(re-find #"Baltimore" %) :region-name))
 
 
 
