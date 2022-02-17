@@ -18,11 +18,6 @@
 ^kind/dataset
 (tc/head values-data)
 
-(-> values-data
-    (tc/select-rows (comp #(= % "New York, NY") #(get % "RegionName")))
-    (get "2021-12-31")
-    float)
-
 (tc/rows (ds/select-rows rental-data (range 2)) :as-maps)
 
 ;; date region region_id rental-value home-value
@@ -90,17 +85,28 @@
                             (map tct/string->time)
                             (map tct/->months-end))))))
 
+(defn appreciation [current-home-values-col old-home-values-col ds]
+  (fun/* 100 (fun//
+              (fun/- (current-home-values-col ds)
+                     (old-home-values-col ds))
+              (old-home-values-col ds))))
+
 (def transformed-home-value-data
   (-> values-data
       (transform-home-value-ds)
       (ds/column-cast :date :packed-local-date)
       (tc/add-column :home-value-last-year #(fun/shift (:home-value %) 12))
-      (tc/add-column :appreciation
-                    (fn [ds]
-                      (fun/* 100
-                              (fun// (fun/- (:home-value ds) (:home-value-last-year ds))
-                                    (:home-value ds)))))
-      (tc/drop-columns [:home-value-last-year])))
+      (tc/add-column :home-value-five-year #(fun/shift (:home-value %) (* 5 12)))
+      (tc/add-column :home-value-ten-year #(fun/shift (:home-value %) (* 10 12)))
+      (tc/add-column :appreciation-1yr
+                     (partial appreciation :home-value :home-value-last-year))
+      (tc/add-column :appreciation-5yr
+                     (partial appreciation :home-value :home-value-five-year))
+      (tc/add-column :appreciation-10yr
+                     (partial appreciation :home-value :home-value-ten-year))
+      (tc/drop-columns [:home-value-last-year
+                        :home-value-five-year
+                        :home-value-ten-year])))
 
 
 ^kind/dataset
@@ -132,7 +138,9 @@ transformed-home-value-data
        (-> transformed-home-value-data
            ;; (tc/select-rows (comp #(= % 395078) :region-id))
            (tct/slice "2021-01-01" "2021-12-31")
-           (tc/select-columns [:date :region-id :region-name :home-value :appreciation]))
+           (tc/select-columns [:date :region-id :region-name
+                               :home-value :appreciation-1yr
+                               :appreciation-5yr :appreciation-10yr]))
        (-> transformed-rental-data
            ;; (tc/select-rows (comp #(= % 395078) :region-id))
            (tct/slice "2021-01-01" "2021-12-31")
@@ -151,16 +159,18 @@ rtp-data
 
 ^kind/dataset
 (-> rtp-data
-    (tc/select-columns [:date :region-name :rtp :appreciation])
+    (tc/select-columns [:date :region-name :rtp :appreciation-1yr :appreciation-5yr :appreciation-10yr])
     (tct/adjust-frequency tct/->years-end
                           {:include-columns [:date :region-name]
                            :ungroup? true})
     (tc/group-by [:region-name])
     (tc/aggregate {:mean-rtp #(fun/mean (:rtp %))
-                   :mean-appreciation #(fun/mean (:appreciation %))})
+                   :mean-appreciation-1yr #(fun/mean (:appreciation-1yr %))
+                   :mean-appreciation-5yr #(fun/mean (:appreciation-5yr %))
+                   :mean-appreciation-10yr #(fun/mean (:appreciation-10yr %))})
     (tc/select-rows (comp #(> % 0.65) :mean-rtp))
-    (tc/reorder-columns [:region-name :mean-rtp :mean-appreciation])
-    (tc/order-by [:mean-appreciation :mean-rtp] :desc))
+    (tc/reorder-columns [:region-name :mean-appreciation-1yr :mean-appreciation-5yr :mean-appreciation-10yr :mean-rtp])
+    (tc/order-by [:mean-appreciation-1yr :mean-appreciation-5yr :mean-appreciation-10yr :mean-rtp] :desc))
 
 ;; ^kind/dataset
 ;; (tc/select-rows
