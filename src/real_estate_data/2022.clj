@@ -95,6 +95,7 @@
   (-> values-data
       (transform-home-value-ds)
       (ds/column-cast :date :packed-local-date)
+      (tc/group-by :region-id)
       (tc/add-column :home-value-last-year #(fun/shift (:home-value %) 12))
       (tc/add-column :home-value-five-year #(fun/shift (:home-value %) (* 5 12)))
       (tc/add-column :home-value-ten-year #(fun/shift (:home-value %) (* 10 12)))
@@ -104,9 +105,11 @@
                      (partial appreciation :home-value :home-value-five-year))
       (tc/add-column :appreciation-10yr
                      (partial appreciation :home-value :home-value-ten-year))
+      (tc/ungroup)
       (tc/drop-columns [:home-value-last-year
                         :home-value-five-year
                         :home-value-ten-year])))
+
 
 
 ^kind/dataset
