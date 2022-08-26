@@ -2,5 +2,14 @@
  :deps  {scicloj/tablecloth  {:mvn/version "6.051"}
          org.scicloj/tablecloth.time {:mvn/version "1.00-alpha-5-SNAPSHOT"}
          ;; org.scicloj/viz.clj {:mvn/version "0.1.1"}
-         scicloj/notespace   {:mvn/version "3-beta8"}}}
-
+         ;; scicloj/notespace   {:mvn/version "3-beta8"}}
+         ;; io.github.nextjournal/clerk {:mvn/version "0.5.346"}
+         ;; io.github.nextjournal/clerk {:local/root "../scicloj/clerk"}
+         }
+ :aliases {:clay
+           {:extra-deps {org.scicloj/clay {:mvn/version "1-alpha1"}
+                         cider/cider-nrepl {:mvn/version "0.28.3"}}
+            :main-opts
+            ["-m" "nrepl.cmdline"
+             "--middleware" "[scicloj.clay.v1.nrepl/middleware,cider.nrepl/cider-middleware]"
+             "-i"]}}}
