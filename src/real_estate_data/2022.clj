@@ -1,6 +1,10 @@
 (ns real-estate-data.2022
-  (:require [notespace.api :as notespace]
-            [notespace.kinds :as kind]))
+  (:require [scicloj.clay.v2.api :as clay]))
+
+(comment
+  (clay/start!)
+  
+  )
 
 
 (require '[tablecloth.api :as tc]
