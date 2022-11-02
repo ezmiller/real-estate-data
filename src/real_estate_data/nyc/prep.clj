@@ -8,7 +8,7 @@
    [scicloj.kindly.v3.kind :as kind]))
 
 
-(clay/start!)
+#_(clay/start!)
 
 (defn fix-column-names [s]
   (comp keyword s/lower-case #(s/replace % #"\s" "-")))
@@ -29,6 +29,9 @@
                                                           s/lower-case)})))
             (tc/dataset)
             csv-files)))
+
+(kind/pprint
+ (tc/head ds))
 
 (kind/pprint
  (tc/info ds))
