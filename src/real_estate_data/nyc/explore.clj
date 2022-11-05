@@ -1,5 +1,4 @@
 ^:kindly/hide-code?
-
 (ns real-estate-data.nyc.explore
   (:require [tablecloth.api :as tc]
             [tech.v3.datatype.functional :as fun]
@@ -7,25 +6,25 @@
             [scicloj.clay.v2.api :as clay]
             [scicloj.kindly.v3.api :as kindly]
             [scicloj.kindly.v3.kind :as kind]
+            [scicloj.kindly.v3.kindness :as kindness]
             [scicloj.viz.api :as viz]
             [aerial.hanami.templates :as ht]
             [aerial.hanami.common :as hc]
             ))
 
-^:kind/hidden
+^:kindly/hide-code?
 (clay/start!)
 
 ;; Here is our dataset 
 (def ds (tc/dataset "./data/nyc-annual-sales--merged.csv"
                     {:key-fn keyword}))
 
-(kind/pprint
- (tc/head ds))
+(tc/row-count ds)
 
+(tc/head ds)
 
 ;; Let's look at general descriptive statistics
-(kind/pprint
- (tc/info ds))
+(tc/info ds)
 
 (defn clean-ds [ds]
   (-> ds
@@ -40,8 +39,7 @@
 (def cleaned-ds
   (clean-ds ds))
 
-(kind/pprint
- (tc/info cleaned-ds))
+(tc/info cleaned-ds)
 
 (-> cleaned-ds
     tc/info
@@ -62,12 +60,10 @@
 
 (-> cleaned-ds
     (tc/select-columns [:sale-price])
-    (tc/select-rows (comp #(< % 4000000) :sale-price))
     viz/data
     (viz/x :sale-price)
     (viz/type [:histogram {:bin-count 30}])
-    viz/viz
-    )
+    viz/viz)
 
 (defn histogram [ds x]
   (-> ds
@@ -123,4 +119,32 @@
               :HEIGHT 800
               :TRANSFORM [{:filter {:field :building-class-category
                                     :equal single-family}}]})
+    )
+
+^:kind/vega
+(-> cleaned-ds
+    (tc/group-by [:neighborhood :building-class-category])
+    (tc/aggregate
+     {:sale-price (comp fun/mean :sale-price)})
+    (tc/select-rows
+     (fn [row]
+       (let [category (:building-class-category row)]
+         (or (= category single-family)
+             (= category two-family)
+             (= category three-family)))))
+    (viz/data)
+    (viz/type ht/grouped-bar-chart)
+    (viz/viz {:HEIGHT 800
+              :Y :neighborhood :YTYPE "nominal"
+              :YSORT "x"
+              :X :sale-price
+              :COLUMN :building-class-category :COLTYPE "ordinal"}))
+
+
+(-> cleaned-ds
+    (tc/add-column :avg-rent 3194)
+    (tc/map-columns :rent-to-price
+                    [:sale-price :avg-rent]
+                    (fn [price avg-rent]
+                      (* 100 (/ avg-rent price))))
     )
