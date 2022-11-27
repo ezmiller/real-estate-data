@@ -4,15 +4,18 @@
             [tech.v3.datatype.functional :as fun]
             [clojure.string :as s]
             [scicloj.clay.v2.api :as clay]
+            [scicloj.kindly-default.v1.api :as kindly-default]
             [scicloj.kindly.v3.api :as kindly]
             [scicloj.kindly.v3.kind :as kind]
             [scicloj.kindly.v3.kindness :as kindness]
             [scicloj.viz.api :as viz]
             [aerial.hanami.templates :as ht]
             [aerial.hanami.common :as hc]
+            [tablecloth.time.api :as tct]
             ))
 
 ^:kindly/hide-code?
+(kindly-default/setup!)
 (clay/start!)
 
 ;; Here is our dataset 
@@ -121,7 +124,6 @@
                                     :equal single-family}}]})
     )
 
-^:kind/vega
 (-> cleaned-ds
     (tc/group-by [:neighborhood :building-class-category])
     (tc/aggregate
@@ -141,10 +143,52 @@
               :COLUMN :building-class-category :COLTYPE "ordinal"}))
 
 
-(-> cleaned-ds
-    (tc/add-column :avg-rent 3194)
-    (tc/map-columns :rent-to-price
-                    [:sale-price :avg-rent]
-                    (fn [price avg-rent]
-                      (* 100 (/ avg-rent price))))
+;; rent to price
+
+
+;; https://www.rentcafe.com/average-rent-market-trends/us/ny/brooklyn/
+
+(def ds-rent-to-price
+  (-> cleaned-ds
+      (tc/add-column :avg-rent 3194)
+      (tc/map-columns :rent-to-price
+                      :float32
+                      [:sale-price :avg-rent]
+                      (fn [price avg-rent]
+                        (* 100 (/ avg-rent price))))))
+
+
+(tc/head ds-rent-to-price)
+
+(-> ds-rent-to-price
+    (tc/select-rows (comp #(= single-family %) :building-class-category))
+    (tc/select-rows (comp #(< % 1) :rent-to-price))
+    (tc/group-by [:neighborhood])
+    (tc/aggregate
+     {:mean-rent-to-price (comp fun/mean :rent-to-price)})
+    (viz/data)
+    (viz/type ht/bar-chart)
+    (viz/viz {:Y :neighborhood 
+              :YTYPE "nominal"
+              :YSORT "x"
+              :X :mean-rent-to-price
+              :HEIGHT 800})
     )
+
+
+;; time dimension
+
+(-> cleaned-ds
+    viz/data
+    (viz/type ht/line-chart)
+    (viz/viz {:X :sale-date :XTYPE "temporal"
+              :Y :sale-price}))
+
+
+(-> cleaned-ds
+    (tct/adjust-frequency tct/->months-end)
+    (tc/aggregate {:median-sale-price (comp fun/median :sale-price)})
+    viz/data
+    (viz/type ht/line-chart)
+    (viz/viz {:X :sale-date :XTYPE "temporal"
+              :Y :median-sale-price}))
